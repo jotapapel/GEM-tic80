@@ -49,6 +49,12 @@ coreKit.graphics.clear = function(colour)
 	memset(0x0000, (colour<<4)+colour, 16320)
 end
 
+coreKit.graphics.tile = function(tile, colour)
+	pal(15, colour)
+	map(0, 0, 30, 17, 0, 0, 0, 1, function() return tile end)
+	pal()
+end
+
 coreKit.graphics.rect = function(style, x, y, w, h, colour)
 	((style == coreKit.graphics.BOX and rectb) or rect)(x, y, w, h, colour)
 end

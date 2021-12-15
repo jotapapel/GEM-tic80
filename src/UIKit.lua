@@ -92,7 +92,7 @@ UIKit.Panel = object.prototype(function()
 	function setWidth(self, width) self.width = width - self.padding.horizontal end
 	function setHeight(self, height) self.height = height - self.padding.vertical end
 	function setSize(self, width, height) self.width, self.height = width - self.padding.horizontal, height - self.padding.vertical end
-
+	function size(self) return #self.elements end
 	function disable(self) for _, element in self:iterator() do element:disable() end end
 	function enable(self) for _, element in self:iterator() do element:enable() end end
 
@@ -191,21 +191,16 @@ UIKit.Command = object.prototype(UIKit.Label, function()
 		self.parent.activeCommand = nil
 	end
 
-	function appendCommand(self, arg1, ...)
+	function append(self, arg1, ...)
 		local command, flag, option = UIKit.Command(arg1, {padding = {right = 20, top = 2, left = 12, bottom = 2}}), ...
 		if arg1 == self.SEPARATOR then command.label, command.flag, command.height = UIKit.Text(""), arg1, 1 end
 		if flag == self.OPTION then command.selected, command.flag = option, flag end
-		self.menu:setSize(math.max(self.menu:getWidth(), command:getWidth()), self.menu:getHeight() + command:getHeight())
+		self.commandView:setSize(math.max(self.menu:getWidth(), command:getWidth()), self.menu:getHeight() + command:getHeight())
 		return self.menu:append(command)
 	end
 
-	function constructor(self, arg1, arg2)
-		if arg2 then self:set(arg2) end
-		super.constructor(self, arg1)
-	end
-
 	function update(self)
-		if self.hover and self.menu then self.parent.activeCommand = self end
+		if self.hover and self.commandView:size() > 0 then self.parent.activeCommand = self end
 		if self.flag ~= self.SEPARATOR then super.update(self) end
 	end
 
@@ -214,11 +209,31 @@ UIKit.Command = object.prototype(UIKit.Label, function()
 		super.draw(self)
 		if self.flag == self.SEPARATOR then coreKit.graphics.line(self.x, self.y + self.padding.top, self.x + self:getWidth(), self.y + self.padding.top, 0) end
 		if self.flag == self.OPTION and self.selected then coreKit.font.print(string.char(32 - 7), self.x + 2, self.y + self.padding.top, self.colour, coreKit.font.BOLD) end
-		if self.menu and self:isActiveCommand() then self.menu:draw(self.x, self.y + self:getHeight()) end
+		if self.commandView:size() > 0 and self:isActiveCommand() then self.menu:draw(self.x, self.y + self:getHeight()) end
 	end
 end);
 
-UIKit.CommandMenu = object.prototype(UIKit.Panel, function()
+UIKit.CommandView = object.prototype(UIKit.Panel, function()
+	activeCommand = nil
+
+	function onActive(self, command)
+		self.activeCommand = command
+	end
+
+	function append(self, label, properties)
+		local command = UIKit.Command(name, properties)
+		command.commandView = UIKit.CommandView()
+		return super.append(self, command)
+	end
+
+	function draw(self)
+		coreKit.graphics.rect(coreKit.graphics.FILL, 0, 0, self:getWidth(), self:getHeight(), 15)
+		coreKit.graphics.line(0, self:getHeight(), self:getWidth(), self:getHeight(), 0)
+		super.draw(self, 0, 0)
+	end
+end);
+
+--[[UIKit.CommandMenu = object.prototype(UIKit.Panel, function()
 	function onActive(self, command)
 		if command.onActive then command.onActive() elseif self.parent.onActive then self.parent:onActive(command) end
 		if command.flag ~= UIKit.Command.OPTION then self.parent:hideCommandMenu() end
@@ -233,7 +248,7 @@ UIKit.CommandMenu = object.prototype(UIKit.Panel, function()
 		local position = (start and start - 1) or 0
 		return function()
 			position = position + 1
-			if position <= #self.elements then self.elements[position]:setWidth(self:getWidth()) return position, self.elements[position] 	end
+			if position <= #self.elements then self.elements[position]:setWidth(self:getWidth()) return position, self.elements[position] end
 		end
 	end
 
@@ -243,7 +258,7 @@ UIKit.CommandMenu = object.prototype(UIKit.Panel, function()
 		coreKit.graphics.rect(coreKit.graphics.BOX, x, y, self:getWidth() + 2, self:getHeight() + 2, 0)
 		if coreKit.mouse.check(coreKit.mouse.LEFT) and self.parent:isActiveCommand() and not coreKit.mouse.inside(x, y, x + self:getWidth(), y+ self:getHeight()) then self.parent:hideCommandMenu() end
 	end
-end);
+end);--]]
 
 UIKit.MenuBar = object.prototype(UIKit.Panel, function()
 	width, height = coreKit.graphics.WIDTH - 5, 10
