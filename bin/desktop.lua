@@ -38,6 +38,7 @@ coreKit = object.struct(function()
 		function border(a)poke(0x03FF8,a or 0)end
 		function clear(a)a=a or 0;memset(0x0000,(a<<4)+a,16320)end
 		function rect(a,b,c,d,e,f)(a==coreKit.graphics.BOX and rectb or rect)(b,c,d,e,f)end
+		line = line
 	end)
 	mouse = object.struct(function()
 		local buff,cur=0,0
@@ -136,7 +137,7 @@ UIKit.CommandView = object.prototype(UIKit.Panel, function()
 	function append(self,b,c,d)local a=UIKit.Command(b,c)if not d then a.commandView=UIKit.CommandView(0,0,{parent=a,padding={horizontal=0,vertical=0},iterator=UIKit.Command.commandViewIterator,onActive=UIKit.Command.commandViewOnActive})end;return super.append(self,a)end
 	function draw(self,a,b)local a,b=a or 0,b or 0;coreKit.graphics.rect(coreKit.graphics.FILL,a,b,self:getWidth(),self:getHeight(),15)coreKit.graphics.rect(coreKit.graphics.BOX,a-1,b-1,self:getWidth()+2,self:getHeight()+2,0)super.draw(self,a,b)end
 end)
-AlertBox = object.prototype(UIKit.Panel, function()
+UIKit.AlertBox = object.prototype(UIKit.Panel, function()
 	width,height=coreKit.graphics.WIDTH-40,coreKit.graphics.HEIGHT-40
 	padding={horizontal=5,vertical=5}
 	separation=2
