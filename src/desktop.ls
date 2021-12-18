@@ -162,7 +162,7 @@ prototype UIKit.AlertBox is UIKit.Panel def
 	width,height=coreKit.graphics.WIDTH-40,coreKit.graphics.HEIGHT-40
 	padding={horizontal=5,vertical=5}
 	separation=2
-	function onActive(self,a)self.parent:dismissAlert()end
+	function onActive(self,a)if a==self.okButton then self.parent:dismissAlert()end end
 	function iterator(self,a)local b=a and a-1 or 0;return function()b=b+1;if b<=#self.elements then local c=self.elements[b]if c.prototype~=UIKit.Button then c:setWidth(self:getWidth()-20)end;return b,c end end end
 	constructor(self,a,b,c)super.constructor(self,_,_,c)self.okButton=self:append(UIKit.Button("OK"))self.okButton.position=UIKit.ABSOLUTE;self:append(UIKit.Label(a,{padding={right=6,top=3,left=6,bottom=0},style=coreKit.font.BOLD,separation=1.5}))self:append(UIKit.Label(b,{padding={right=6,top=0,left=6,bottom=0},separation=1.5}))end
 	function draw(self)local a,b=(coreKit.graphics.WIDTH-self:getWidth())/2,(coreKit.graphics.HEIGHT-self:getHeight())/2;self.okButton.x,self.okButton.y=(coreKit.graphics.WIDTH-self.okButton:getWidth())/2,b+self:getHeight()-self.padding.vertical*2-self.okButton:getHeight()coreKit.graphics.rect(coreKit.graphics.FILL,a,b,self:getWidth(),self:getHeight(),15)super.draw(self,a+5,b+5)coreKit.graphics.rect(coreKit.graphics.BOX,a,b,self:getWidth(),self:getHeight(),0)for c=0,1 do coreKit.graphics.rect(coreKit.graphics.BOX,a+3+c,b+3+c,self:getWidth()-c*2-6,self:getHeight()-c*2-6,0)end end
@@ -179,7 +179,7 @@ end
 
 struct _PROGRAM def
 
-foreground, background, tile = 8, 7, 209
+	foreground, background, tile = 8, 7, 209
 	loadTime = 1
 	
 	-- TitleBar/MenuBar

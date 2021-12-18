@@ -301,7 +301,7 @@ UIKit.AlertBox = object.prototype(UIKit.Panel, function()
 	separation = 2
 
 	function onActive(self, element)
-		self.parent:dismissAlert()
+		if element == self.okButton then self.parent:dismissAlert() end
 	end
 
 	function iterator(self, start)
