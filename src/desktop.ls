@@ -62,6 +62,11 @@ struct coreKit def
 		function inside(a,b,c,d)local e,f=peek(0x0FF84),peek(0x0FF85)return math.inside(e,f,a,b,c,d)end
 		function update()local a,b,c=peek(0x0FF84),peek(0x0FF85),peek(0x0FF86)buff=c>0 and math.min(2,buff+1)or 0;poke(0x03FFB,0)pal(1,0)spr(224+cur*2,a-5,b-5,0,1,0,0,2,2)pal()end
 	end
+	
+	struct keyboard def
+		function check(a, b)return (a and keyp or key)(b)end
+	end
+	
 end
 
 struct UIKit def
@@ -74,6 +79,8 @@ prototype UIKit.Text def
 	width,height=0,0
 	style,lineHeight=coreKit.font.REGULAR,1
 	lines={}
+	function getWidth(self)return self.width end
+	function getHeight(self)return self.height end
 	function setWidth(self,a)self.width=math.max(0,a)end
 	function setHeight(self,a)self.height=math.max(0,a)end
 	function setContent(self,a)self.lines={}string.gsub(string.format("%s\n",tostring(a)),"(.-)\n",function(b)local c,d=coreKit.font.print(b,self.style)table.insert(self.lines,{b,c,d})self.width=math.max(self.width,c)end)self.height=coreKit.font.HEIGHT*self.lineHeight*#self.lines end
@@ -126,7 +133,12 @@ prototype UIKit.Label is UIKit.Object def
 	function getWidth(self)return self.border*2+self.padding.left+self.width+self.padding.right end
 	function getHeight(self)return self.border*2+self.padding.top+self.height+self.padding.bottom end
 	constructor(self,a,b)if b then self:set(b) end;local a=UIKit.Text(a,self.style,self.separation)super.constructor(self,{label=a,width=a.width,height=a.height})end
-	function draw(self)if self.background>-1 then coreKit.graphics.rect(coreKit.graphics.FILL,self.x,self.y,self:getWidth(),self:getHeight(),self.background)end;local a,b=math.floor((self.width-self.label.width)*self.align.horizontal),math.floor((self.height-self.label.height)*self.align.horizontal)self.label:draw(self.x+self.border+self.padding.left+a,self.y+self.border+self.padding.top+a,self.colour,self.align.horizontal)for c=0,self.border-1 do coreKit.graphics.rect(coreKit.graphics.BOX,self.x+c,self.y+c,self:getWidth()-c*2,self:getHeight()-c*2,0)end end
+	function draw(self)
+		if self.background>-1 then coreKit.graphics.rect(coreKit.graphics.FILL,self.x,self.y,self:getWidth(),self:getHeight(),self.background)end
+		local a,b=math.floor((self.width-self.label.width)*self.align.horizontal),math.floor((self.height-self.label.height)*self.align.horizontal)
+		--coreKit.graphics.rect(coreKit.graphics.FILL,self.x+self.border+self.padding.left+a,self.y+self.border+self.padding.top+a,self.label:getWidth(),self.label:getHeight(),3)
+		self.label:draw(self.x+self.border+self.padding.left+a,self.y+self.border+self.padding.top+a,self.colour,self.align.horizontal)for c=0,self.border-1 do coreKit.graphics.rect(coreKit.graphics.BOX,self.x+c,self.y+c,self:getWidth()-c*2,self:getHeight()-c*2,0)end
+	end
 end
 
 prototype UIKit.Button is UIKit.Label def
@@ -141,21 +153,47 @@ prototype UIKit.Command is UIKit.Label def
 	padding={right=5,top=2,left=5,bottom=2}
 	style,align= coreKit.font.REGULAR,{horizontal=UIKit.LEFT,vertical=UIKit.MIDDLE}
 	commandView,flag=nil,nil
+	
 	function isActiveCommand(self)return self.parent.activeCommand==self end
-	function hideCommandMenu(self)self.parent.activeCommand=nil end
-	function append(self,a,...)local b,c,d=self.commandView:append(a,{padding={right=20,top=2,left=12,bottom=2}},true),...if a==self.SEPARATOR then b.label,b.flag,b.height=UIKit.Text(""),a,1 end;if c==self.OPTION then b.selected,b.flag=d,c end;self.commandView:setSize(math.max(self.commandView:getWidth(),b:getWidth()),self.commandView:getHeight()+b:getHeight())return b end
-	function commandViewOnActive(self,a)if a.onActive then a:onActive()elseif self.parent.onActive then self.parent:onActive(a)end;if a.flag~=UIKit.Command.OPTION then self.parent:hideCommandMenu()end end
+	function hideCommandView(self)self.parent.activeCommand=nil end
+	function append(self,a,...)local b,c,d=self.commandView:append(a,{padding={right=19,top=2,left=12,bottom=2}},true),...if a==self.SEPARATOR then b.label,b.flag,b.height=UIKit.Text(""),a,1 end;if c==self.OPTION then b.selected,b.flag=d,c end;self.commandView:setSize(math.max(self.commandView:getWidth(),b:getWidth()),self.commandView:getHeight()+b:getHeight())return b end
+	function commandViewOnActive(self,a)if a.onActive then a:onActive()elseif self.parent.onActive then self.parent:onActive(a)end;if a.flag~=UIKit.Command.OPTION then self.parent:hideCommandView()end end
 	function commandViewIterator(self)local a=0;return function()a=a+1;if a<=#self.elements then self:element(a):setWidth(self:getWidth())return a,self:element(a)end end end
 	function update(self)if self.hover and self.commandView then self.parent.activeCommand=self end;if self.flag~=self.SEPARATOR then super.update(self)end end
-	function draw(self)if self.hover or self.active or self:isActiveCommand()then self.colour,self.background=15,0 else self.colour,self.background=0,15 end;super.draw(self)if self.flag==self.SEPARATOR then coreKit.graphics.line(self.x,self.y+self.padding.top,self.x+self:getWidth(),self.y+self.padding.top,0)end;if self.flag==self.OPTION and self.selected then coreKit.font.print(string.char(32-9),self.x+2,self.y+self.padding.top,self.colour,coreKit.font.BOLD)end;if self.commandView and self:isActiveCommand()then local a,b=self.x,self.y;if a+self.commandView:getWidth()>coreKit.graphics.WIDTH then a=coreKit.graphics.WIDTH-self.commandView:getWidth()-7 end;if coreKit.mouse.check(coreKit.mouse.LEFT)and self:isActiveCommand()and not coreKit.mouse.inside(a,b,a+self.commandView:getWidth(),b+self.commandView:getHeight())then self:hideCommandMenu()end;self.commandView:draw(a,b+self:getHeight()+1)end end
+	
+	function draw(self)
+		if self.hover or self.active or self:isActiveCommand()then self.colour,self.background=15,0 else self.colour,self.background=0,15 end
+		super.draw(self)
+		if self.flag==self.SEPARATOR then coreKit.graphics.line(self.x,self.y+self.padding.top,self.x+self:getWidth(),self.y+self.padding.top,0)end
+		if self.flag==self.OPTION and self.selected then coreKit.font.print(string.char(32-9),self.x+2,self.y+self.padding.top,self.colour,coreKit.font.BOLD)end
+		if self.shortcut and self.flag ~= self.SEPARATOR then 
+			--coreKit.graphics.rect(coreKit.graphics.FILL, self.x + self:getWidth() - 4 - self.shortcut:getWidth(), self.y + self.padding.top, self.shortcut:getWidth(), self.shortcut:getHeight(), 2)
+			self.shortcut:draw(self.x + self:getWidth() - 4 - self.shortcut:getWidth(), self.y + self.padding.top, self.colour)
+		end
+		if self.commandView and self:isActiveCommand() then 
+			local a,b=self.x,self.y
+			if a+self.commandView:getWidth()+6>coreKit.graphics.WIDTH then a=coreKit.graphics.WIDTH-self.commandView:getWidth()-7 end
+			self.commandView:draw(a,b+self:getHeight()+1)
+		end 
+	end
+	
 end
 
 prototype UIKit.CommandView is UIKit.Panel def
 	padding={horizontal=6,vertical=0}
 	activeCommand=nil
-	function onActive(self,a)self.activeCommand=a end
-	function append(self,b,c,d)local a=UIKit.Command(b,c)if not d then a.commandView=UIKit.CommandView(0,0,{parent=a,padding={horizontal=0,vertical=0},iterator=UIKit.Command.commandViewIterator,onActive=UIKit.Command.commandViewOnActive})end;return super.append(self,a)end
-	function draw(self,a,b)local a,b=a or 0,b or 0;coreKit.graphics.rect(coreKit.graphics.FILL,a,b,self:getWidth(),self:getHeight(),15)coreKit.graphics.rect(coreKit.graphics.BOX,a-1,b-1,self:getWidth()+2,self:getHeight()+2,0)super.draw(self,a,b)end
+	shortcutList={}
+	function addShortcut(self,a,b,c)
+		--if b.onActive then 
+			self.shortcutList[a]=b
+			b.shortcut = UIKit.Text(c, coreKit.font.BOLD)
+			b.width = b.width + b.shortcut:getWidth()
+		--end
+	end	
+	function onActive(self,a)if a.onActive then a.onActive()elseif self.parent.onActive then self.parent:onActive(a)end;if a.flag~=UIKit.Command.OPTION then self.parent:hideCommandMenu()end end
+	function append(self,b,c,d)local a=UIKit.Command(b,c)if not d then a.commandView=UIKit.CommandView(0,0,{parent=a,padding={horizontal=0,vertical=0},iterator=UIKit.Command.commandViewIterator,onActive=UIKit.Command.commandViewOnActive})end;return super.append(self,a)end	
+	constructor(self,...)self.shortcutList={}super.constructor(self,...)end
+	function draw(self,a,b)a,b=a or 0,b or 0;for c,d in pairs(self.shortcutList)do if d.onActive and peek(0x0FF89)==65 and peek(0x0FF88)==c then d:onActive()end end;if self.parent and coreKit.mouse.check(coreKit.mouse.LEFT)and self.parent:isActiveCommand()and not coreKit.mouse.inside(a,b,a+self:getWidth(),b+self:getHeight())then self.parent:hideCommandView()end;coreKit.graphics.rect(coreKit.graphics.FILL,a,b,self:getWidth(),self:getHeight(),15)coreKit.graphics.rect(coreKit.graphics.BOX,a-1,b-1,self:getWidth()+2,self:getHeight()+2,0)super.draw(self,a,b)end
 end
 
 prototype UIKit.AlertBox is UIKit.Panel def
@@ -191,7 +229,7 @@ struct _PROGRAM def
 	
 	local titleName, titleNameCommands = this.menuBar:append("Desktop", {style = coreKit.font.BOLD, position = UIKit.ABSOLUTE}), {}
 	titleName.x, titleName.y = coreKit.graphics.WIDTH - titleName:getWidth() - 6, 0
-	titleNameCommands.info = titleName:append("About Desktop...")
+	titleNameCommands.info = titleName:append("About Desktop... ")
 	titleNameCommands.pref = titleName:append("Preferences")
 	titleNameCommands.help = titleName:append("Help")
 	titleName:append(UIKit.Command.SEPARATOR)
@@ -204,6 +242,9 @@ struct _PROGRAM def
 	function titleNameCommands.exit:onActive()
 		exit()
 	end
+	
+	this.menuBar:addShortcut(9, titleNameCommands.info, "F1")
+	this.menuBar:addShortcut(17, titleNameCommands.exit, "^Q")
 	
 	local fileName, fileNameCommands = this.menuBar:append("File"), {}
 	fileNameCommands.open = fileName:append("Open")
@@ -231,11 +272,14 @@ struct _PROGRAM def
 		end
 	end
 	
+	this.menuBar:addShortcut(28, viewNameOptions.icon, "^I")
+	this.menuBar:addShortcut(29, viewNameOptions.text, "^T")
+	
 	local optionsName, optionsNameCommands = this.menuBar:append("Options"), {}
 	optionsNameCommands.idrv = optionsName:append("Format drive")
 	optionsNameCommands.exec = optionsName:append("Execute command")
 	optionsName:append(UIKit.Command.SEPARATOR)
-	optionsNameCommands.sbkg = optionsName:append("Set background...")
+	optionsNameCommands.sbkg = optionsName:append("Set background... ")
 	
 	-- IconView
 	
@@ -250,8 +294,10 @@ struct _PROGRAM def
 	alertView = nil
 	
 	function showAlert(self, title, subtitle, icon)
-		self.menuBar:disable()
-		self.alertBox = UIKit.AlertBox(title, subtitle, {parent = self})
+		if not self.alertBox then
+			self.menuBar:disable()
+			self.alertBox = UIKit.AlertBox(title, subtitle, {parent = self})
+		end
 	end
 	
 	function dismissAlert(self)

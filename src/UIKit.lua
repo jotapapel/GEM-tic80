@@ -182,6 +182,8 @@ UIKit.Command = object.prototype(UIKit.Label, function()
 	padding = {right = 5, top = 2, left = 5, bottom = 2}
 	style, align = coreKit.font.REGULAR, {horizontal = UIKit.LEFT, vertical = UIKit.MIDDLE}
 	menu, flag = nil, nil
+	
+	shortcutKey = shortcut = UIKit.Label(string.format("^%s", "A"), {style = coreKit.font.BOLD})
 
 	function isActiveCommand(self)
 		return self.parent.activeCommand == self
@@ -198,8 +200,13 @@ UIKit.Command = object.prototype(UIKit.Label, function()
 		self.commandView:setSize(math.max(self.menu:getWidth(), command:getWidth()), self.menu:getHeight() + command:getHeight())
 		return self.menu:append(command)
 	end
+	
+	function setShortcut(self, key)
+		self.shortcut = UIKit.Text(string.format("^%s", key), coreKit.font.BOLD)
+	end
 
 	function update(self)
+		if self.shortcutKey and coreKit.keyboard.check(65) and coreKit.keyboard.check(self.shortcutKey, true) then self:onActive() end
 		if self.hover and self.commandView:size() > 0 then self.parent.activeCommand = self end
 		if self.flag ~= self.SEPARATOR then super.update(self) end
 	end
@@ -209,6 +216,7 @@ UIKit.Command = object.prototype(UIKit.Label, function()
 		super.draw(self)
 		if self.flag == self.SEPARATOR then coreKit.graphics.line(self.x, self.y + self.padding.top, self.x + self:getWidth(), self.y + self.padding.top, 0) end
 		if self.flag == self.OPTION and self.selected then coreKit.font.print(string.char(32 - 7), self.x + 2, self.y + self.padding.top, self.colour, coreKit.font.BOLD) end
+		if self.shortcut then self.shortcut:draw(self.x + self:getWidth() - self.padding.right - self.shortcut:getWidth(), self.y + self.padding.top, 0) end
 		if self.commandView:size() > 0 and self:isActiveCommand() then self.menu:draw(self.x, self.y + self:getHeight()) end
 	end
 end);
@@ -217,7 +225,8 @@ UIKit.CommandView = object.prototype(UIKit.Panel, function()
 	activeCommand = nil
 
 	function onActive(self, command)
-		self.activeCommand = command
+		if command.onActive then command.onActive() elseif self.parent.onActive then self.parent:onActive(command) end
+		if command.flag ~= UIKit.Command.OPTION then self.parent:hideCommandMenu() end
 	end
 
 	function append(self, label, properties)
@@ -226,10 +235,12 @@ UIKit.CommandView = object.prototype(UIKit.Panel, function()
 		return super.append(self, command)
 	end
 
-	function draw(self)
-		coreKit.graphics.rect(coreKit.graphics.FILL, 0, 0, self:getWidth(), self:getHeight(), 15)
-		coreKit.graphics.line(0, self:getHeight(), self:getWidth(), self:getHeight(), 0)
-		super.draw(self, 0, 0)
+	function draw(self, x, y)
+		x, y = x or 0, y or 0
+		if self.parent and coreKit.mouse.check(coreKit.mouse.LEFT) and self.parent:isActiveCommand() and not coreKit.mouse.inside(x, y, x + self:getWidth(), y + self:getHeight()) then self.parent:hideCommandView() end
+		coreKit.graphics.rect(coreKit.graphics.FILL, x, y, self:getWidth(), self:getHeight(), 15)
+		coreKit.graphics.rect(coreKit.graphics.BOX, x, y, self:getWidth(), self:getHeight(), 0)
+		super.draw(self, x, y)
 	end
 end);
 
