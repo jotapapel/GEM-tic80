@@ -68,7 +68,7 @@ local function process(f)
 			k, r = line:match("^(end)(.-)$")
 			if k then
 				if (newlines[#newlines]:sub(-1) == ",") then newlines[#newlines] = newlines[#newlines]:sub(1, -2) end
-				if il == obi then line, obi = string.format("end)%s", r), obi - 1 end
+				if il == obi then line, obi = string.format("end);%s", r), obi - 1 end
 			end
 
 			-- redirect comments and long strings
@@ -135,6 +135,9 @@ if filename then
 		file:write(table.expand(lines, "\n"))
 		file:close()
 		
+		-- print success
+		print(string.format("file created: %s", table.expand(dirbits, "/")))
+		
 	else
 	
 		-- print contents to terminal
@@ -146,6 +149,6 @@ if filename then
 else
 	
 	-- wrong arguments
-	print("usage: lua ../ls.lua path/to/file.ls [--minimal] [--display]")
+	print("usage: lua ../ls.lua path/to/file.ls [--display] [--minimal]")
 
 end

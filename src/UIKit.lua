@@ -8,29 +8,26 @@ UIKit.LEFT, UIKit.CENTRE, UIKit.RIGHT = 0, .5, 1
 UIKit.RELATIVE, UIKit.ABSOLUTE = 0xD1, 0xD2
 
 UIKit.Text = object.prototype(function()
+	
 	width, height = 0, 0
 	style, lineHeight = coreKit.font.REGULAR, 1
 	lines = {}
-
-	function setWidth(self, width) self.width = math.max(0, width) end
-	function setHeight(self, height) self.height = math.max(0, height) end
-
-	function setContent(self, content)
+	
+	function set(self, content)
 		self.lines = {}
 		string.gsub(string.format("%s\n", tostring(content)), "(.-)\n", function(line)
 			local width, height = coreKit.font.print(line, self.style)
-			table.insert(self.lines, {line, width, height})
-			self.width = math.max(self.width, width)
-		end);
-		self.height = (coreKit.font.HEIGHT * self.lineHeight) * #self.lines
+			self.lines[#self.lines + 1] = {line, width, height}
+			self.width, self.height = math.max(self.width, width), self.height + (height * self.lineHeight)
+		end)
 	end
-
+	
 	function constructor(self, content, style, lineHeight)
 		self.style, self.lineHeight = style or self.style, lineHeight or self.lineHeight
-		self:setContent(content)
+		self:set(content)
 	end
-
-	local function adjust(width, str, style)
+	
+	local function adjust(str, width, style)
 		local newStr, newStrWidth = "", 0
 		for position = 1, #str do
 			local char, charWidth = str:sub(position, position), style.width
@@ -40,7 +37,7 @@ UIKit.Text = object.prototype(function()
 		end
 		return newStr, newStrWidth - 1
 	end
-
+	
 	function draw(self, x, y, colour, align)
 		local totalHeight = 0
 		coreKit.graphics.rect(coreKit.graphics.FILL, x, y, self.width, self.height, 7)
@@ -53,6 +50,7 @@ UIKit.Text = object.prototype(function()
 			coreKit.font.print(text, x + math.floor((self.width - width) * align), y + ((position - 1) * (height * self.lineHeight)) + lineh, colour or 15, self.style)
 		end
 	end
+	
 end);
 
 UIKit.Object = object.prototype(function()

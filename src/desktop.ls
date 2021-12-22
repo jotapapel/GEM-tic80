@@ -37,7 +37,7 @@ struct coreKit def
 	struct font def
 		HEIGHT=6
 		REGULAR={address=0,adjust={[2]="&",[1]="#$*?@%^%dmw",[-1]="\"%%+/<>\\{}",[-2]="()1,;%[%]`jl",[-3]="!'%.:|i"},width=5}
-		BOLD={address=112,adjust={[3]="mw",[2]="#&",[1]="$*?@^%dMW~",[-1]="%%+/<>\\{}",[-2]="()1,;%[%]`jl",[-3]="!'%.:|i"},width=6}
+		BOLD={address=112,adjust={[3]="mw",[2]="#&",[1]="$*?@^%d~",[-1]="%%+/<>\\{}",[-2]="()1,;%[%]`jl",[-3]="!'%.:|i"},width=6}
 		function print(a,b,...)local c,d,a,e,f,g,h=0,6,string.match(tostring(a),"(.-)\n")or tostring(a),b,...g,h=g or 0,h or(...and this.REGULAR or b)pal(15,g)for i=1,#a do local j,k=a:sub(i,i),h.width;for l,m in pairs(h.adjust)do if j:match(string.format("[%s]",m))then k=k+l end end;if j:match("%u")then k=k+1 elseif j:match("%s")and i>1 then c=c-1 end;if f then spr(h.address+j:byte()-32,e+c,f,0)end;c=c+k end;pal()return c-1,this.HEIGHT end
 	end
 	
@@ -86,7 +86,17 @@ prototype UIKit.Text def
 	function setContent(self,a)self.lines={}string.gsub(string.format("%s\n",tostring(a)),"(.-)\n",function(b)local c,d=coreKit.font.print(b,self.style)table.insert(self.lines,{b,c,d})self.width=math.max(self.width,c)end)self.height=coreKit.font.HEIGHT*self.lineHeight*#self.lines end
 	constructor(self,a,b,c)self.style,self.lineHeight=b or self.style,c or self.lineHeight;self:setContent(a)end
 	local function adjust(a,b,c)local d,e="",0;for f=1,#b do local g,h=b:sub(f,f),c.width;for i,j in pairs(c.adjust)do if g:match(string.format("[%s]",j))then h=h+i end end;if g:match("%u")then h=h+1 elseif g:match("%s")then e=e-1 end;if e+h-1<=a then d,e=d..g,e+h else break end end;return d,e-1 end
-	function draw(self,a,b,c,d)local e=0;for f,g in ipairs(self.lines)do local d,h,i,j=d or UIKit.LEFT,table.unpack(g)local k=math.floor(j*(self.lineHeight-1)/2)if e+j+k*2<=self.height then e=e+j+k*2 else break end;if i>self.width then h,i=adjust(self.width,h,self.style)end;coreKit.font.print(h,a+math.floor((self.width-i)*d),b+(f-1)*j*self.lineHeight+k,c or 15,self.style)end end
+	function draw(self,a,b,c,d)
+		local e=0
+		for f,g in ipairs(self.lines) do
+			local d,h,i,j=d or UIKit.LEFT,table.unpack(g)
+			local k=math.floor(j*(self.lineHeight-1)/2)
+			if e+j+k*2<=self.height then e=e+j+k*2 else break end
+			if i>self.width then h,i=adjust(self.width,h,self.style)end
+			coreKit.graphics.rect(coreKit.graphics.FILL,a+math.floor((self.width-i)*d),b+(f-1)*j*self.lineHeight+k,i,j,6)
+			coreKit.font.print(h,a+math.floor((self.width-i)*d),b+(f-1)*j*self.lineHeight+k,c or 15,self.style)
+		end
+	end
 end
 
 prototype UIKit.Object def
@@ -135,8 +145,8 @@ prototype UIKit.Label is UIKit.Object def
 	constructor(self,a,b)if b then self:set(b) end;local a=UIKit.Text(a,self.style,self.separation)super.constructor(self,{label=a,width=a.width,height=a.height})end
 	function draw(self)
 		if self.background>-1 then coreKit.graphics.rect(coreKit.graphics.FILL,self.x,self.y,self:getWidth(),self:getHeight(),self.background)end
-		local a,b=math.floor((self.width-self.label.width)*self.align.horizontal),math.floor((self.height-self.label.height)*self.align.horizontal)
-		--coreKit.graphics.rect(coreKit.graphics.FILL,self.x+self.border+self.padding.left+a,self.y+self.border+self.padding.top+a,self.label:getWidth(),self.label:getHeight(),3)
+		local a,b=math.round((self.width-self.label.width)*self.align.horizontal),math.round((self.height-self.label.height)*self.align.vertical)
+		coreKit.graphics.rect(coreKit.graphics.FILL,self.x+self.border+self.padding.left+a,self.y+self.border+self.padding.top+a,self.label:getWidth(),self.label:getHeight(),3)
 		self.label:draw(self.x+self.border+self.padding.left+a,self.y+self.border+self.padding.top+a,self.colour,self.align.horizontal)for c=0,self.border-1 do coreKit.graphics.rect(coreKit.graphics.BOX,self.x+c,self.y+c,self:getWidth()-c*2,self:getHeight()-c*2,0)end
 	end
 end
@@ -167,7 +177,7 @@ prototype UIKit.Command is UIKit.Label def
 		if self.flag==self.SEPARATOR then coreKit.graphics.line(self.x,self.y+self.padding.top,self.x+self:getWidth(),self.y+self.padding.top,0)end
 		if self.flag==self.OPTION and self.selected then coreKit.font.print(string.char(32-9),self.x+2,self.y+self.padding.top,self.colour,coreKit.font.BOLD)end
 		if self.shortcut and self.flag ~= self.SEPARATOR then 
-			--coreKit.graphics.rect(coreKit.graphics.FILL, self.x + self:getWidth() - 4 - self.shortcut:getWidth(), self.y + self.padding.top, self.shortcut:getWidth(), self.shortcut:getHeight(), 2)
+			coreKit.graphics.rect(coreKit.graphics.FILL, self.x + self:getWidth() - 4 - self.shortcut:getWidth(), self.y + self.padding.top, self.shortcut:getWidth(), self.shortcut:getHeight(), 2)
 			self.shortcut:draw(self.x + self:getWidth() - 4 - self.shortcut:getWidth(), self.y + self.padding.top, self.colour)
 		end
 		if self.commandView and self:isActiveCommand() then 
@@ -236,14 +246,14 @@ struct _PROGRAM def
 	titleNameCommands.exit = titleName:append("Quit")
 	
 	function titleNameCommands.info:onActive()
-		this:showAlert("GEM/1 Desktop, Dec. 2021\ntic80\n---", "Graphics Environment Manager\n@jotapapel\nCopyleft (l) 2021")
+		this:showAlert("GEM/1 Desktop, Dec. 2021\ntic80", "Graphics Environment Manager\nhttp://github.com/jotapapel/GEM-tic80\nCopyleft (l) 2021")
 	end
 	
 	function titleNameCommands.exit:onActive()
 		exit()
 	end
 	
-	this.menuBar:addShortcut(9, titleNameCommands.info, "F1")
+	this.menuBar:addShortcut(9, titleNameCommands.info, "^I")
 	this.menuBar:addShortcut(17, titleNameCommands.exit, "^Q")
 	
 	local fileName, fileNameCommands = this.menuBar:append("File"), {}
@@ -272,7 +282,7 @@ struct _PROGRAM def
 		end
 	end
 	
-	this.menuBar:addShortcut(28, viewNameOptions.icon, "^I")
+	this.menuBar:addShortcut(28, viewNameOptions.icon, "^M")
 	this.menuBar:addShortcut(29, viewNameOptions.text, "^T")
 	
 	local optionsName, optionsNameCommands = this.menuBar:append("Options"), {}
