@@ -1,8 +1,15 @@
-struct UIKit def
-	LEFT, CENTRE, RIGHT = 0, 0.5, 1
-end
+--[[
+	GEM-tic80
+	User Interface Kit
+	by @jotapapel
+	Dic, 2021
+--]]
 
-prototype UIKit.Text def
+@package UIKit
+
+LEFT, CENTRE, RIGHT = 0, 0.5, 1
+	
+prototype Text def
 
 	width, height = 0, 0
 	style, lineHeight = coreKit.font.REGULAR, 1
@@ -47,14 +54,21 @@ prototype UIKit.Text def
 
 end
 
-prototype UIKit.Object def
+prototype Object def
 
-	timestamp, parent = 0, nil
 	x, y, width, height = 0, 0, 0, 0
-	padding, border = {right = 0, top = 0, left = 0, bottom = 0}, {size = 0, colour = -1}
+	padding, border, position = {right = 0, top = 0, left = 0, bottom = 0}, {size = 0, colour = -1}, UIKit.RELATIVE
 	background, colour = 15, 0
 	hover, active, enabled = false, false, true
 	onHover, onActive = nil, nil
+	
+	function enable(self)
+		self.enabled = true
+	end
+	
+	function disable(self)
+		self.enabled = false
+	end
 
 	function setWidth(self, newWidth)
 		self.width = math.max(0, newWidth - (self.border.size * 2) - self.padding.right - self.padding.left)
@@ -82,5 +96,25 @@ prototype UIKit.Object def
 		self.hover = coreKit.mouse.inside(self.x, self.y, self.x + self:getWidth(), self.y + self:getHeight())
 		self.active = self.hover and coreKit.mouse.check(coreKit.mouse.LEFT, true)
 	end
+
+	function draw(self)
+		if self.background > -1 then corekit.graphics.rect(coreKit.graphics.FILL, self.x, self.y, self:getWidth(), self.getHeight(), self.background) end
+		if self.border.colour > -1 then for i = 0, self.border.size - 1 do coreKit.graphics.rect(coreKit.graphics.BOX, self.x + i, self.y + i, self:getWidth() - (i * 2), self:getHeight() - (i * 2), 0) end end
+	end
+
+end
+
+prototype Container def
+
+	timestamp = 0
+	width, height = 0, 0
+	padding, display, gap = {horizontal = 0, vertical = 0}, UIKit.RELATIVE, 0
+	elements = {}
+	
+	function append(self, element)
+		element.parent, self.elements[#self.elements + 1] = self, element
+		return element
+	end
+	
 
 end

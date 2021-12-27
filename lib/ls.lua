@@ -12,11 +12,9 @@ function string.gsubr(a,b,c) local d=b.len==nil and error("Replace table missing
 function table.expand(a,b,c) local d=""for e=1,#a-1 do d=string.format("%s%s%s",d,a[e]:mask(c),b)end;return#a>0 and string.format("%s%s",d,a[#a]:mask(c))or nil end
 
 local function process(f)
-	local minimal, file, newlines, lines = args("--minimal"), io.open(f, "r"), {}, {}
-	local il, is = 0, (minimal and "") or string.char(9)
-	local showc, lsc, ilgs, isc = not minimal, nil, nil, false
-	local ost, ist, obi = 0, 0, 0
-	
+	local minimal, file, newlines, lines = args("--min"), io.open(f, "r"), {}, {}
+	local il, is, obi = 0, (minimal and "") or string.char(9)
+	local showc, lsc, ilgs, isc = not minimal, nil, nil, false
 	if file then
 		for l in io.lines(f) do table.insert(lines, l) end
 		file:close()
@@ -44,8 +42,7 @@ local function process(f)
 			line, ss91 = line:gsubc("(%[%[.-%]%])", "<str$/>")
 			line, oss91 = line:gsubc("%[%[", "<str>")
 			line, ss39 = line:gsubc([[%b'']], "<str$/>")
-			line, ss34 = line:gsubc([[%b""]], "<str$/>")
-			
+			line, ss34 = line:gsubc([[%b""]], "<str$/>")
 			-- 1: local keyword
 			l = line:match("^(local%s+)")
 			
@@ -63,17 +60,24 @@ local function process(f)
 			-- 4: constructor function
 			k, r = line:match("^constructor(%(.-%))(.-)$")
 			if k then line = string.format("function constructor%s%s", k, string.def(r)) end
-						
-			-- 5: closings
+					
+			-- 5: package emulation
+			k = line:match("^@package%s+([_%w]+)$")
+			if k then line = string.format("local %s={};setmetatable(_G,{__newindex=%s})", k, k) end
+					
+			-- 6: closings
 			k, r = line:match("^(end)(.-)$")
 			if k then
 				if (newlines[#newlines]:sub(-1) == ",") then newlines[#newlines] = newlines[#newlines]:sub(1, -2) end
 				if il == obi then line, obi = string.format("end);%s", r), obi - 1 end
 			end
 
+			-- 7: minifier
+			line = line:gsub("%s*([,=+-])%s*", "%1")
+
 			-- redirect comments and long strings
-			if (line:match("^.-(<comment>)$")) then lsc, isc = n, true end
-			if (line:match("^.-(<str>).-$") and line:match("^.-(<str.-/>).-$") == nil) then lsc, isc = n, false end
+			if (line:match("^.-(<comment>)$")) then lsc, isc = ln, true end
+			if (line:match("^.-(<str>).-$") and line:match("^.-(<str.-/>).-$") == nil) then lsc, isc = ln, false end
 
 			-- replace placeholders
 			line = line:gsubr(ss34):gsubr(ss39):gsubr(ss91):gsubr(oss91)
@@ -86,8 +90,8 @@ local function process(f)
 			if #l > 0 or #c > 0 then table.insert(newlines, string.format("%s%s%s", is:rep(il), line, c)) end
 			if (l:match("^(while).-$") or l:match("^(repeat)$") or (l:match("^.-%s*(function<parenthesis/>)$") or l:match("^.-%s*(function)%s+.-$")) or l:match("^.-%s+(then)$") or l:match("^(else)$") or (l:match("^.-(do)$") and not l:match("^.-(end).-$")) or l:match("^.-%s*({)%s*$")) then il = il + 1 end
 
-		elseif n > lsc then
-
+		else
+		
 			-- insert placeholders
 			local cmlc, css91
 			line, cmlc = line:gsubc("%-%-%]%]", "</comment>")
@@ -100,13 +104,13 @@ local function process(f)
 			line = line:gsubr(css91):gsubr(cmlc, (showc) and "$" or "")
 
 			-- display comment or long string
-			if showc or not isc and #line > 0 then table.insert(newlines, string.format("%s%s", is:rep(il), line)) end
+			if showc or not isc and #line > 0 then table.insert(newlines, string.format("%s%s%s", lf:match("^(%s*).-$"), is:rep(il), line)) end
 
 		end
 	end
 
 	-- return result
-	return newlines, newlines[1]:match("^@compile%s+(.-)$")
+	return newlines, newlines[1]:match("^@compile%s*(.-)$")
 
 end
 
@@ -118,7 +122,7 @@ if filename then
 	if outpath then table.remove(lines, 1) end
 	
 	-- if not display, create a lua file
-	if not args("--display") then
+	if not args("--echo") then
 		
 		-- get basepath for new file
 		if outpath then basepath, strip = string.gsub(debug.getinfo(1).short_src, "^(.+\\)[^\\]+$", "%1"), 2 end
@@ -132,7 +136,7 @@ if filename then
 		
 		-- write new lua file
 		local file = io.open(table.expand(dirbits, "/"), "w")
-		file:write(table.expand(lines, "\n"))
+		file:write(table.expand(lines, (args("--min") and ";") or "\n"))
 		file:close()
 		
 		-- print success
@@ -142,13 +146,13 @@ if filename then
 	
 		-- print contents to terminal
 		local f = string.format(" %%0%si %%s", math.max(2, #tostring(#lines)))
-		for n, line in ipairs(lines) do print(string.format(f, n, line)) end
+		for ln, lf in ipairs(lines) do print(string.format(f, ln, lf)) end
 		
 	end
 	
 else
 	
 	-- wrong arguments
-	print("usage: lua ../ls.lua path/to/file.ls [--display] [--minimal]")
+	print("usage: lua ../ls.lua ../file.ls [--min] [--echo]\n--min  Minifies the result.\n--echo Displays the result to the console.")
 
 end
