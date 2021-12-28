@@ -1,14 +1,6 @@
---[[
-	GEM-tic80
-	UIKit - Simple user-interface components.
-	by @jotapapel, Dec. 2021
---]]
-
 setmetatable(_G, {__index = function(t, k) return k == "TIC" and rawget(t, "main") end})
 setfenv=setfenv or function(a,b)for c=1,math.huge do local d=debug.getupvalue(a,c)if d==nil then break elseif d=="_ENV"then debug.upvaluejoin(a,c,function()return b end,1)break end end;return a end;function table.define(a,b,c)setfenv(b,setmetatable(c or{self=a},{__index=_G,__newindex=a}))()return a end;object=table.define({},function()local function f(self,g)return self[g]end;local function h(self,i)for g,j in pairs(i)do self[g]=j end end;local function k(self)return tostring(self):match("^.-%s(.-)$")end;function struct(l)return table.define({},l)end;function prototype(m,n)local o,p=n and m,n or m;local prototype=setmetatable({super=o,get=f,set=h,hash=k},{__index=o})return table.define(prototype,p,{self=prototype,super=o})end;function create(prototype,...)local e=setmetatable({prototype=prototype},{__index=prototype})if type(prototype.constructor)=="function"then prototype.constructor(e,...)end;return e end end)
-
 function pal(a,b)if a and b then poke4(0x3FF0*2+a,b)else for c=0,15 do poke4(0x3FF0*2+c,c)end end end
-
 FontKit = object.struct(function()
 	NORMAL = {address = 0, adjust = {[1] = "#*?%^mw", [-1] = "\"%%+/<>\\{}IT", [-2] = "(),;%[%]`1jl", [-3] = "!'%.:|i"}, width = 5}
 	BOLD = {address = 112, adjust={[3] = "mw", [2] = "#", [1] = "*?^~", [-1] = "%%+/<>\\{}IT", [-2] = "()1,;%[%]`jl", [-3] = "!'%.:|i"}, width = 6}
@@ -27,7 +19,6 @@ FontKit = object.struct(function()
 		return width - 1, self.HEIGHT
 	end
 end)
-
 CoreKit = object.struct(function()
 	mouse = object.struct(function()
 		local buffer, cur = 0, 0
@@ -86,17 +77,13 @@ CoreKit = object.struct(function()
 		line = line
 	end)
 end)
-
-struct UIKit def
+UIKit = object.struct(function()
 	LEFT, CENTRE, RIGHT = 0, 0.5, 1
-end
-
-prototype UIKit.Text def
-
+end)
+UIKit.Text = object.prototype(function()
 	width, height = 0, 0
 	style, lineHeight = FontKit.NORMAL, 1
 	lines = {}
-	
 	function set(self, content)
 		self.lines = {}
 		string.gsub(string.format("%s\n", tostring(content)), "(.-)\n", function(line)
@@ -105,12 +92,10 @@ prototype UIKit.Text def
 			self.width, self.height = math.max(self.width, width), self.height + (8 * self.lineHeight)
 		end)
 	end
-	
-	constructor(self, content, style, lineHeight)
+	function constructor(self, content, style, lineHeight)
 		self.style, self.lineHeight = style or self.style, lineHeight or self.lineHeight
 		self:set(content)
 	end
-	
 	local function adjust(str, width, style)
 		local newStr, newStrWidth = "", 0
 		for position = 1, #str do
@@ -121,7 +106,6 @@ prototype UIKit.Text def
 		end
 		return newStr, newStrWidth - 1
 	end
-	
 	function draw(self, x, y, colour, align)
 		local totalHeight = 0
 		for position, line in ipairs(self.lines) do
@@ -133,17 +117,10 @@ prototype UIKit.Text def
 			FontKit.print(text, x + math.floor((self.width - width) * align), y + ((position - 1) * (height * self.lineHeight)) + lineh + 1, colour or 15, self.style)
 		end
 	end
-
-end
-
+end)
 local text1 = object.create(UIKit.Text, "Desktop", FontKit.NORMAL)
-
 function main()
-
 	CoreKit.graphics.clear(1)
-	
 	text1:draw(32, 32, 15, UIKit.CENTRE)
-	
 	CoreKit.mouse.update()
-	
 end

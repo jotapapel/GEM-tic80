@@ -37,7 +37,7 @@ function table.expand(a,b,c) local d=""for e=1,#a-1 do d=string.format("%s%s%s",
 			-- insert placeholders
 			local slc, omlc, ss34, ss39, ss91, oss91
 			line, slc = line:gsubc("%-%-%[%[.-%-%-%]%]", "<comment$/>")
-			k = line:match("^.-(%-%-%[%[).-$") or line:match("^.-(%-%-).-$")
+			--k = line:match("^.-(%-%-%[%[).-$") or line:match("^.-(%-%-).-$")
 			if k then
 				local l, r = line:match(string.format("^(.-)%s(.-)$", k:gsub("%-", "%%-"):gsub("%[", "%%[")))
 				line, comment = string.format("%s%s", l:trim(), (k == "--[[" and "--[[" or "")), (#r > 0) and string.format("%s%s", (#l > 0) and " " or "", r:mask("--$")) or ""
