@@ -1,7 +1,12 @@
-local filename, arg1, arg2, arg3 = ...
-local function args(b)return arg1==b or arg2==b or arg3==b end
+--[[
+	GEM-tic80
+	Script Preprocessor - For ease of scripting.
+	by @jotapapel, Dec. 2021
+	v. 1.1
+--]]
 
-local _name = "object"
+local lib, filename, arg1, arg2, arg3 = "object", ...
+local function args(b)return arg1==b or arg2==b or arg3==b end
 
 unpack=table.unpack or unpack
 function string.mask(a,b) if b then a=b:gsub("%$",a)end;return a end
@@ -10,10 +15,9 @@ function string.trim(...) local d={...}for e,f in ipairs(d)do d[e]=string.match(
 function string.gsubc(a,b,c) local d,e={},1;a=a:gsub(b,function(f)local g=string.format("%s%03i",tostring(d):sub(-4),e)d[g],e=f,e+1;return g:mask(c)end)d.token,d.len=c,e;return a,d end
 function string.gsubr(a,b,c) local d=b.len==nil and error("Replace table missing length value.",2)or b.len;local e=b.token==nil and error("Replace table missing token.",2)or b.token;for f=1,d do local g=string.format("%s%03i",tostring(b):sub(-4),f)a=a:gsub(g:mask(e),function()return string.def(b[g],"",c)end)end;return a end
 function table.expand(a,b,c) local d=""for e=1,#a-1 do d=string.format("%s%s%s",d,a[e]:mask(c),b)end;return#a>0 and string.format("%s%s",d,a[#a]:mask(c))or nil end
-
-local function process(f)
+local function process(f)
 	local minimal, file, newlines, lines = args("--min"), io.open(f, "r"), {}, {}
-	local il, is, obi = 0, (minimal and "") or string.char(9)
+	local il, is, im = 0, (minimal and "") or string.char(9)
 	local showc, lsc, ilgs, isc = not minimal, nil, nil, false
 	if file then
 		for l in io.lines(f) do table.insert(lines, l) end
@@ -42,19 +46,20 @@ local function process(f)
 			line, ss91 = line:gsubc("(%[%[.-%]%])", "<str$/>")
 			line, oss91 = line:gsubc("%[%[", "<str>")
 			line, ss39 = line:gsubc([[%b'']], "<str$/>")
-			line, ss34 = line:gsubc([[%b""]], "<str$/>")
+			line, ss34 = line:gsubc([[%b""]], "<str$/>")
+
 			-- 1: local keyword
 			l = line:match("^(local%s+)")
 			
 			-- 2: structures
-			k = line:match(string.format("^%sstruct%%s+([_%%w]+)%%s+def$", string.def(l)))
-			if k then line, obi = string.format("%s%s = %s.struct(function()", string.def(l), k, _name), il + 1 end
+			k = line:match(string.format("^%sstruct%%s+([_%%.%%w]+)%%s+def$", string.def(l)))
+			if k then line, im = string.format("%s%s = %s.struct(function()", string.def(l), k, lib), il + 1 end
 			
 			-- 3: prototypes
 			k, r = line:match(string.format("^%sprototype%%s+([_%%.%%w]+)%%s+(.-)%%s*def$", string.def(l)))
 			if k then
 				local s = r:match("^is%s+([_%.%w]+)$")
-				line, obi = string.format("%s%s = %s.prototype(%sfunction()", string.def(l), k, _name, string.def(s, "", "$, ")), il + 1
+				line, im = string.format("%s%s = %s.prototype(%sfunction()", string.def(l), k, lib, string.def(s, "", "$, ")), il + 1
 			end
 			
 			-- 4: constructor function
@@ -62,18 +67,25 @@ local function process(f)
 			if k then line = string.format("function constructor%s%s", k, string.def(r)) end
 					
 			-- 5: package emulation
-			k = line:match("^@package%s+([_%w]+)$")
-			if k then line = string.format("local %s={};setmetatable(_G,{__newindex=%s})", k, k) end
+			k = line:match("^package%s+([_%w]+)%s+def$")
+			if k then 
+				line, im = string.format("%s = {}", k), il + 1
+				table.insert(lines, ln + 1, "do")
+			end
+			
+			-- 6: main function
+			k = line:match("^@main%s+([_%w]+)$")
+			if k then line = string.format("(getmetatable(_G) or getmetatable(setmetatable(_G, {}))).__index = function(t, k) if k == \"%s\" then return rawget(t, \"main\") end end", k) end
 					
-			-- 6: closings
+			-- 7: closings
 			k, r = line:match("^(end)(.-)$")
 			if k then
 				if (newlines[#newlines]:sub(-1) == ",") then newlines[#newlines] = newlines[#newlines]:sub(1, -2) end
-				if il == obi then line, obi = string.format("end);%s", r), obi - 1 end
+				if il == im then line, im = string.format("end)%s", r), im - 1 end
 			end
 
-			-- 7: minifier
-			line = line:gsub("%s*([,=+-])%s*", "%1")
+			-- minifier
+			if minimal then line = line:gsub("%s*([,=+-])%s*", "%1") end
 
 			-- redirect comments and long strings
 			if (line:match("^.-(<comment>)$")) then lsc, isc = ln, true end
@@ -136,23 +148,28 @@ if filename then
 		
 		-- write new lua file
 		local file = io.open(table.expand(dirbits, "/"), "w")
-		file:write(table.expand(lines, (args("--min") and ";") or "\n"))
+		file:write(table.expand(lines, "\n"))
 		file:close()
-		
+
 		-- print success
 		print(string.format("file created: %s", table.expand(dirbits, "/")))
 		
-	else
+		-- verbose
+		if args("--verbose") then
+			local f = string.format(" %%0%si %%s", math.max(2, #tostring(#lines)))
+			for ln, lf in ipairs(lines) do print(lf) end
+		end
+		
+	elseif args("--echo") then
 	
-		-- print contents to terminal
-		local f = string.format(" %%0%si %%s", math.max(2, #tostring(#lines)))
-		for ln, lf in ipairs(lines) do print(string.format(f, ln, lf)) end
+		-- only prints contents to console
+		for ln, lf in ipairs(lines) do print(lf) end
 		
 	end
 	
 else
 	
 	-- wrong arguments
-	print("usage: lua ../ls.lua ../file.ls [--min] [--echo]\n--min  Minifies the result.\n--echo Displays the result to the console.")
+	print("usage: lua ../ls.lua ../file.ls [--min] [--echo]\n--min     Minifies the result.\n--echo    Raw printing of the result.\n--verbose Formatted printing of the result.")
 
 end
