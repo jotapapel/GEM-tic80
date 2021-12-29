@@ -20,13 +20,13 @@ FontKit = object.struct(function()
 	end
 end)
 ColourKit = object.struct(function()
+	BLACK, WHITE = 0, 15
+	IRON, STEEL, GREY, SILVER = 1, 12, 13, 14
 	MAROON, RED = 2, 3
 	GREEN, LIME = 4, 5
 	NAVY, BLUE = 6, 7
 	TEAL, AQUA = 8, 9
 	GOLD, YELLOW = 10, 11
-	BLACK, WHITE = 0, 15
-	IRON, STEEL, GREY, SILVER = 1, 12, 13, 14
 end)
 CoreKit = object.struct(function()
 	mouse = object.struct(function()
@@ -65,14 +65,6 @@ CoreKit = object.struct(function()
 	graphics = object.struct(function()
 		WIDTH, HEIGHT = 240, 136
 		FILL, BOX = 0xF1, 0xF2
-		function isLoaded(self)
-			return time() > (self.timestamp or 0) + 10
-		end
-		function tile(address, background)
-			pal(15, background)
-			map(0, 0, 30, 17, 0, 0, 0, 1, function() return address end)
-			pal()
-		end
 		function border(colour)
 			poke(0x03FF8, colour or 0)
 		end
@@ -80,10 +72,18 @@ CoreKit = object.struct(function()
 			colour = colour or 0
 			memset(0x0000, (colour<<4) + colour, 16320)
 		end
+		function isLoaded(self)
+			return time() > (self.timestamp or 0) + 10
+		end
+		line = line
 		function rect(style, x, y, width, height, colour)
 			(style == self.BOX and rectb or rect)(x, y, width, height, colour)
 		end
-		line = line
+		function tile(address, background)
+			pal(15, background)
+			map(0, 0, 30, 17, 0, 0, 0, 1, function() return address end)
+			pal()
+		end
 	end)
 end)
 UIKit = object.struct(function()
@@ -97,14 +97,6 @@ UIKit.Text = object.prototype(function()
 	function constructor(self, content, style, lineHeight)
 		self.style, self.lineHeight = style or self.style, lineHeight or self.lineHeight
 		self:setContent(content)
-	end
-	function setContent(self, content)
-		self.lines = {}
-		string.gsub(string.format("%s\n", tostring(content)), "(.-)\n", function(line)
-			local width, _ = FontKit.print(line, self.style)
-			self.lines[#self.lines + 1] = {line, width, 8}
-			self.width, self.height = math.max(self.width, width), self.height + (8 * self.lineHeight)
-		end)
 	end
 	local function adjust(str, width, style)
 		local newStr, newStrWidth = "", 0
@@ -127,6 +119,14 @@ UIKit.Text = object.prototype(function()
 			FontKit.print(text, x + math.floor((self.width - width) * align), y + ((position - 1) * (height * self.lineHeight)) + lineh + 1, colour or 15, self.style)
 		end
 	end
+	function setContent(self, content)
+		self.lines = {}
+		string.gsub(string.format("%s\n", tostring(content)), "(.-)\n", function(line)
+			local width, _ = FontKit.print(line, self.style)
+			self.lines[#self.lines + 1] = {line, width, 8}
+			self.width, self.height = math.max(self.width, width), self.height + (8 * self.lineHeight)
+		end)
+	end
 end)
 UIKit.Object = object.prototype(function()
 	timestamp, parent = nil, nil
@@ -140,15 +140,20 @@ UIKit.Object = object.prototype(function()
 		self.timestamp = time()
 		if type(properties) == "table" then self:set(properties) end
 	end
-	function setContent(self, content, style, lineHeight)
-		local content = UIKit.Text(content, style, lineHeight)
-		self:set({content = content, width = content.width, height = content.height})
+	function draw(self, background, colour)
+		CoreKit.graphics.rect(CoreKit.graphics.FILL, self.x, self.y, self:getWidth(), self:getHeight(), background or self.background)
+		for border = 0, self.border.size - 1 do CoreKit.graphics.rect(CoreKit.graphics.BOX, self.x + border, self.y + border, self:getWidth() - border * 2, self:getHeight() - border * 2, self.border.colour) end
+		if self.content then self.content:draw(self.x + self.border.size + self.padding.left, self.y + self.border.size + self.padding.top, colour or self.colour, self.align.horizontal) end
+	end
+	function getHeight(self)
+		return (self.border.size * 2) + self.padding.top + self.height + self.padding.bottom
 	end
 	function getWidth(self)
 		return (self.border.size * 2) + self.padding.left + self.width + self.padding.right
 	end
-	function getHeight(self)
-		return (self.border.size * 2) + self.padding.top + self.height + self.padding.bottom
+	function setContent(self, content, style, lineHeight)
+		local content = UIKit.Text(content, style, lineHeight)
+		self:set({content = content, width = content.width, height = content.height})
 	end
 	function update(self)
 		if not self.parent and self.active and CoreKit.mouse.check() and type(self.onActive) == "function" then self:onActive() end
@@ -157,14 +162,80 @@ UIKit.Object = object.prototype(function()
 			self.active = self.hover and CoreKit.mouse.check(CoreKit.mouse.LEFT, true)
 		end
 	end
-	function draw(self, background, colour)
-		CoreKit.graphics.rect(CoreKit.graphics.FILL, self.x, self.y, self:getWidth(), self:getHeight(), background or self.background)
-		for border = 0, self.border.size - 1 do CoreKit.graphics.rect(CoreKit.graphics.BOX, self.x + border, self.y + border, self:getWidth() - border * 2, self:getHeight() - border * 2, self.border.colour) end
-		if self.content then self.content:draw(self.x + self.border.size + self.padding.left, self.y + self.border.size + self.padding.top, colour or self.colour, self.align.horizontal) end
+end)
+UIKit.Container = object.prototype(function()
+	timestamp, parent = nil
+	width, height = 0, 0
+	display, padding, separation = UIKit.RELATIVE, {horizontal = 0, vertical = 0}, 0
+	enabled, overflow = true, false
+	elements = {}
+	function constructor(self, width, height, properties)
+		self:set({width = width, height = height, elements = {}})
+	end
+	function append(self, element)
+		element.parent = self
+		table.insert(self.elements, element)
+		return element
+	end
+	function draw(self, x, y, start)
+		local x, y, margin, spacing = x or 0, y or 0, {horizontal = 0, vertical = 0}, 0
+		for position, element in self:iterator(start) do
+			if self.display == UIKit.RELATIVE and element.position == UIKit.RELATIVE then
+				if margin.horizontal + element:getWidth() > self.width - self.padding.horizontal then margin.horizontal, margin.vertical = 0, margin.vertical + spacing + self.separation end
+				if not self.overflow and (margin.vertical + element:getHeight() > self.height - self.padding.vertical or element:getWidth() > self.width - self.padding.horizontal) then break end
+				element.x, element.y, spacing = x + self.padding.horizontal + margin.horizontal, y + self.padding.vertical + margin.vertical, element:getHeight()
+				margin.horizontal = margin.horizontal + element:getWidth() + self.separation
+			end
+			if self.onActive and element.active and CoreKit.mouse.check() then self:onActive(element) end
+			if element.update and element.enabled and self.enabled then element:update() end
+			if element.draw and CoreKit.graphics.isLoaded(element) then element:draw() end
+		end
+	end
+	function getWidth(self)
+		return self.width + self.padding.horizontal
+	end
+	function getHeight(self)
+		return self.height + self.padding.vertical
+	end
+	function iterator(self, start)
+		local position = (start and start - 1) or 0
+		return function()
+			position = position + 1
+			if position <= self:size() then return position, self.elements[position] end
+		end
+	end
+	function remove(self, element)
+		for position, elem in ipairs(self.elements) do
+			if element == elem then table.remove(self.elements, position) end
+		end
+	end
+	function setHeight(self, height)
+		self.height = height - self.padding.vertical
+	end
+	function setSize(self, width, height)
+		self.width, self.height = width - self.padding.horizontal, height - self.padding.vertical
+	end
+	function setState(self, state)
+		for _, elements in self:iterator() do self.enabled = state end
+	end
+	function setWidth(self, width)
+		self.width = width - self.padding.horizontal
+	end
+	function size(self)
+		return #self.elements
 	end
 end)
+--
+local container1 = UIKit.Container(100, 100)
+local object1 = UIKit.Object({padding = {right = 9, top = 2, left = 9, bottom = 2}})
+object1:setContent("Quit", FontKit.BOLD)
+function container1:onActive(element)
+	if element == object1 then exit() end
+end
+container1:append(object1)
 CoreKit.graphics.border(ColourKit.NAVY)
 function main()
 	CoreKit.graphics.clear()
+	container1:draw()
 	CoreKit.mouse.update()
 end
