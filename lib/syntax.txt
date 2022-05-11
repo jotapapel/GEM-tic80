@@ -1,0 +1,258 @@
+name                   = LuaScript
+file_extensions []     = lsc;
+
+styles [] {
+
+   .comment : style {
+      color                 = #2E8B57
+      textmate_scope        = comment
+   }
+   
+   .foreground : style {
+      color                 = white
+   }
+
+   .variable : style {
+      color                 = #EE82EE
+      textmate_scope        = variable
+   }
+   
+   .number : style {
+      color                 = #FFA500
+      textmate_scope        = constant.numeric
+   }
+   
+   .entity : style {
+      color                 = #66CDAA
+      textmate_scope        = entity.name.class
+   }
+   
+   .string : style {
+      color                 = #FF7F50
+      textmate_scope        = string
+   }
+   
+   .operator : style {
+      color                 = #20B2AA
+      textmate_scope        = keyword.operator
+   }
+   
+   .function : style {
+      color                 = #6495ED
+      textmate_scope        = entity.name.function
+   }
+   
+   .keyword : style {
+      color                 = #9370DB
+      textmate_scope        = keyword
+   }
+   
+}
+
+contexts [] {
+   
+   main : context {
+   
+      : include "comments" ;
+      
+      : inline_push {
+         regex          \= \b(constructor)
+         styles []       = .keyword;
+         : pop {  
+            regex       \= (\))
+            styles []    = .foreground;
+         }
+         : pattern {
+            regex          \= (\w+)
+            styles []       = .number;
+         }
+         : pattern {
+            regex          \= (\()
+            styles []       = .foreground;
+         }
+      }
+      
+      : include "lua";
+      : include "SELF";
+      : include "strings";
+      : include "numbers";
+      
+      : pattern {
+         regex          \= \b(break|do| else|elseif|end|for|if|in|local|repeat|return|then|until|while)\b
+         styles []       = .keyword;
+      }
+      
+      : pattern {
+         regex          \= (#)(?=[\w\d._]+\b)
+         styles []       = .number;
+      }
+      
+      : pattern {
+         regex          \= \b(nil|true|false|math.pi)\b
+         styles []       = .number;
+      }
+      
+       : inline_push {
+         regex          \= (^\s*(var)\b)
+         styles []       = .keyword;
+         default_style   = .foreground
+         : pop {  
+            regex       \= (=|$)
+            styles []    = .foreground;
+         }
+      }
+      
+      : inline_push {
+         regex          \= \b(prototype\s+|struct\s+)([\w\d_\.]+)
+         styles []       = .keyword, .entity;
+         : pop {  
+            regex       \= (def)
+            styles []    = .keyword;
+         }
+         : pattern {
+            regex          \= \b(\s+is\s+)([\w\d_\.]+)
+            styles []       = .keyword, .string;
+         }
+      }
+      
+      : inline_push {
+         regex          \= (function\s+)([\w\d_\.]+)
+         styles []       = .keyword, .variable;
+         : pop {  
+            regex       \= (\))
+            styles []    = .foreground;
+         }
+         : include "SELF";
+         : pattern {
+            regex          \= (\w+)
+            styles []       = .number;
+         }
+         : pattern {
+            regex          \= (\()
+            styles []       = .foreground;
+         }
+      }
+
+      : inline_push {
+         regex          \= (\{)
+         styles []       = .foreground;
+         : pop {  
+            regex       \= (\})
+            styles []    = .foreground;
+         }
+         : include "main" ;
+      }
+      
+      : inline_push {
+         regex          \= (\()
+         styles []       = .foreground;
+         : pop {
+            regex       \= (\))
+            styles []    = .foreground;
+         }
+         : include "lua";
+         : include "SELF";
+         : include "strings";
+         : include "numbers";
+      }
+      
+   }
+
+   strings : context {
+      : inline_push {
+         regex          \= (\")
+         styles []       = .string;
+         : pop {
+            regex       \= (\")
+            styles []    = .string;
+         }
+         : pattern {
+            regex          \= (\\.)
+            styles []       = .number;
+         }
+         : pattern {
+            regex          \= (.)
+            styles []       = .string;
+         }
+      }
+   }
+
+   numbers : context {
+      : pattern {
+         regex          \= (0[xX][0-9a-fA-F]+)
+         styles []       = .number;
+      }
+   
+      : pattern {
+         regex          \= (\-\d*\.?\d+|\b\d*\.?\d+)
+         styles []       = .number;
+      }
+   }
+   
+   SELF : context {
+      : pattern {
+         regex          \= \b(self)\b
+         styles []       = .entity;
+      }
+   
+      : pattern {
+         regex          \= (\.\.\.)
+         styles []       = .number;
+      }
+   }
+   
+   comments : context {
+      : inline_push {
+         regex          \= (\-\-\[\[)
+         styles []       = .comment;
+         default_style   = .comment
+         : pop {
+            regex       \= (\-\-\]\])
+            styles []    = .comment;
+         }
+      }
+      
+      : inline_push {
+         regex          \= (\-\-)
+         styles []       = .comment;
+         default_style   = .comment
+         : pop {
+            regex       \= ($)
+            styles []    = .comment;
+         }
+      }
+   }
+   
+   lua : context {
+      : pattern {
+         regex          \= \b(String|Number|Array|Math|System)\b(?=\.|\()
+         styles []       = .keyword;
+      }
+   
+      : pattern {
+         regex          \= \b(or|and|not)\b
+         styles []       = .operator;
+      }
+   
+      : pattern {
+         regex          \= \b(\:?\.?)([\w\d_]+(?=\())
+         styles []       = .foreground, .function;
+      }
+      
+      : pattern {
+         regex          \= \b(\.)([\w\d_]+)\b
+         styles []       = .foreground, .variable;
+      }
+   
+      : pattern {
+         regex          \= \b(assert|collectgarbage|dofile|error|getfenv|getmetatable|ipairs|loadfile|loadstring|module|next|pairs|pcall|print|rawequal|rawget|rawset|require|select|setfenv|setmetatable|tonumber|tostring|type|unpack|xpcall)\b(?=\[\[|\()
+         styles []       = .function;
+      }
+      
+      : pattern {
+         regex          \= \b(coroutine\.(create|resume|running|status|wrap|yield)|string\.(byte|char|dump|find|format|gmatch|gsub|len|lower|match|rep|reverse|sub|upper)|table\.(concat|insert|maxn|remove|sort)|math\.(abs|acos|asin|atan2?|ceil|cosh?|deg|exp|floor|fmod|frexp|ldexp|log|log10|max|min|modf|pow|rad|random|randomseed|sinh?|sqrt|tanh?)|io\.(close|flush|input|lines|open|output|popen|read|tmpfile|type|write)|os\.(clock|date|difftime|execute|exit|getenv|remove|rename|setlocale|time|tmpname)|package\.(cpath|loaded|loadlib|path|preload|seeall)|debug\.(debug|[gs]etfenv|[gs]ethook|getinfo|[gs]etlocal|[gs]etmetatable|getregistry|[gs]etupvalue|traceback|upvaluejoin))\b(?=\s*(?:[\x{0028}\x{007b}\&quot;\x{0027}]|\[\[|\())
+         styles []       = .function;
+      }
+   }
+   
+}

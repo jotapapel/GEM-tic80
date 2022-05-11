@@ -1,0 +1,1 @@
+if !c: print("me") else print("99")

@@ -1,0 +1,25 @@
+setfenv = setfenv or function(a,b)for c=1,math.huge do local d=debug.getupvalue(a,c)if not d then break elseif d=="_ENV"then debug.upvaluejoin(a,c,function()return b end,1)break end end;return a end
+
+function table.define(target, defn, super)
+	local stencil = setmetatable({self = target, super = super}, {__index = _G, __newindex = target})
+	setfenv(defn, stencil)()
+	return target
+end
+
+prototype = table.define({}, function()
+	local function hash(self) return tostring(self):match("^.-:%s+([%w%d]+)$") end
+	local function get(self, key) return self[key] end
+	local function set(self, properties) for key, value in pairs(properties) do self[key] = value end end
+
+	local function create(prototype, ...)
+		local object = setmetatable({}, {__index = prototype})
+		if prototype.constructor then prototype.constructor(object, ...) end
+		return object
+	end
+
+	function new(arg1, arg2)
+		local super, defn = arg2 and arg1, arg2 or arg1
+		local prototype = setmetatable({get = get, hash = hash, set = set, super = super}, {__index = super, __call = create})
+		return table.define(prototype, defn, super)
+	end
+end)

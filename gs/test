@@ -1,0 +1,22 @@
+local keywords = {["if"] = "(.-)", ["elseif"] = "(.-)", ["else"] = "", ["while"] = "(.-)", ["for"] = "let ([%w%d_]+%s+=%s+%d,%s+%d)", ["foreach"] = "(%[.-%]%s+in%s+.-)"}
+local keyword_closings = {["if"] = "then", ["elseif"] = "then", ["while"] = "do", ["for"] = "do"}
+function parse(str)
+	for key, pattern in pairs(keywords) do
+		local p = string.format("^(%s)%%s+%%(%s%%):%%s*(.-)$", key, pattern))
+		local l, m, r = str:match(p)
+		if (l and m) then
+			l, m, r = l:gsub("foreach", "for"), (l == "foreach" and m:gsub("%[(.-)%]", "%1")) or m, #(r or "") > 0 and string.format(" %s end", r) or ""
+			return str:gsub()
+			
+			string.format("%s %s %s", l, m, keyword_closings[l] or "", r):match("^%s*(.-)%s*$") .. r
+		end
+	end
+	return str
+end
+
+local str = [[if (arg1 == arg2):]]
+str = "func abc(a, b, ...): print(a + b)"
+str = "while (a): print('looping...')"
+str = "for (let i = 0, 2): print(i)"
+
+print(parse(str))

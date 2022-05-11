@@ -1,0 +1,21 @@
+package UIKit
+
+prototype Text def
+
+	static number HEIGHT, table WIDTH = 12, 13 -> local self["#HEIGHT"]
+	number width, height
+	number x, y
+	
+	function helloWorld()
+	
+	end
+
+end
+
+--[[
+nil
+number		#
+string		$
+table			@
+bool			&
+--]]

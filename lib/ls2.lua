@@ -1,11 +1,4 @@
---[[
-	GEM-tic80
-	Script Preprocessor - For ease of scripting.
-	by @jotapapel, Dec. 2021 - Jan. 2022
-	v. 1.2 (07012022)
---]]
-
-local lib, filename, arg1, arg2, arg3 = "Object", ...
+local lib, filename, arg1, arg2, arg3 = "obj", ...
 local function args(b)return arg1==b or arg2==b or arg3==b end
 
 unpack=table.unpack or unpack
@@ -15,10 +8,21 @@ function string.trim(...) local d={...}for e,f in ipairs(d)do d[e]=string.match(
 function string.gsubc(a,b,c) local d,e={},1;a=a:gsub(b,function(f)local g=string.format("%s%03i",tostring(d):sub(-4),e)d[g],e=f,e+1;return g:mask(c)end)d.token,d.len=c,e;return a,d end
 function string.gsubr(a,b,c) local d=b.len==nil and error("Replace table missing length value.",2)or b.len;local e=b.token==nil and error("Replace table missing token.",2)or b.token;for f=1,d do local g=string.format("%s%03i",tostring(b):sub(-4),f)a=a:gsub(g:mask(e),function()return string.def(b[g],"",c)end)end;return a end
 function table.expand(a,b,c) local d=""for e=1,#a-1 do d=string.format("%s%s%s",d,a[e]:mask(c),b)end;return#a>0 and string.format("%s%s",d,a[#a]:mask(c))or nil end
-local function process(f)
+
+local parser = {}
+
+function parser.values(str)
+	return string.gsub(string.format("%s,", str), "%b[]", function(array)
+		return string.format("{%s}", parser.values(array:match("^%[(.-)%]$")))
+	end):gsub("(.-):%s+(.-),%s*", function(k, v)
+		if type(tonumber(k)) == "number" or k:match("^(<str.-/>)$") then k = string.format("[%s]", k:match("^(<str.-/>)$") or tostring(k)) end
+		return string.format("%s = %s, ", k, v)
+	end):match("^(.-),%s*$")
+end
+function parser.process(f)
 	local minimal, file, newlines, lines = args("--min"), io.open(f, "r"), {}, {}
 	local il, is, im = 0, (minimal and "") or string.char(9)
-	local showc, lsc, ilgs, isc = not minimal, nil, nil, false
+	local isc, lsc, ilgs, ient, lco
 	if file then
 		for l in io.lines(f) do table.insert(lines, l) end
 		file:close()
@@ -27,89 +31,121 @@ function table.expand(a,b,c) local d=""for e=1,#a-1 do d=string.format("%s%s%s",
 	for ln, lf in ipairs(lines) do
 
 		-- trim line
+		local level = #lf:match("^(%s*).-$")
 		local line, comment = lf:match("^%s*(.-)%s*$"), ""
 
 		if not lsc then
 
-			-- line parts
-			local l, k, r
+			-- parsing parts
+			local l, m, r
 
-			-- insert placeholders
-			local slc, omlc, ss34, ss39, ss91, oss91
-			line, slc = line:gsubc("%-%-%[%[.-%-%-%]%]", "<comment$/>")
-			--k = line:match("^.-(%-%-%[%[).-$") or line:match("^.-(%-%-).-$")
-			if k then
-				local l, r = line:match(string.format("^(.-)%s(.-)$", k:gsub("%-", "%%-"):gsub("%[", "%%[")))
-				line, comment = string.format("%s%s", l:trim(), (k == "--[[" and "--[[" or "")), (#r > 0) and string.format("%s%s", (#l > 0) and " " or "", r:mask("--$")) or ""
-			end
-			line, omlc = line:gsubc("%-%-%[%[", "<comment>")
+			-- special characters placeholder
+			local scc
+			line, scc = line:gsubc("\\.", "<char/>")
+
+			-- comments
+			l, m, r = line:match("^(.-)%s*(\')%s*(.-)$")
+			if l and m and r then line, comment = l, string.format("-- %s", r) end
+			
+			-- string placeholders
+			local ss34, ss39, ss91, oss91
 			line, ss91 = line:gsubc("(%[%[.-%]%])", "<str$/>")
 			line, oss91 = line:gsubc("%[%[", "<str>")
 			line, ss39 = line:gsubc([[%b'']], "<str$/>")
 			line, ss34 = line:gsubc([[%b""]], "<str$/>")
 
+			-- ternary operator
+			line = line:gsub("(.-)%s:%s(.-)%s%?%s(.-)", "%1 and %2 or %3")
+
+			-- closures
+			if lco and level < lco then
+				line, comment, lco = "end", "", (lco > 1 and lco - 1)
+				table.insert(lines, ln + 1, lf)
+			end
+			
+			-- entity closures
+			if il - 1 == ient and line == "end" then 
+				line, ient = "end)", nil
+			end
+
+			-- prototypes and structures
+			l, m, r = line:match("^(@)[%w%d%._]+.-:$") or line:match("^($)[%w%d%._]+.-:$"), line:match("^.([%w%d%._]+).-:$"), line:match("^@[%w%d%._]+%((.-)%):$")
+			if l and m then
+				line, lco, ient = string.format("%s = object.%s(%sfunction()", m, l == "@" and "prototype" or "struct", string.def(r, "", "$, ")), level + 1, level
+			end
+			
+			-- for loop (one line)
+			l, m, r = line:match("^(for)%s+(.-):%s(.-)$")
+			if l and m then
+				line = string.format("for %s do %s end", m, r)
+			end
+			
+			-- for loop (header)
+			l, m = line:match("^(for)%s+(.-):$")
+			if l and m then 
+				line, lco = string.format("for %s do", m), level + 1
+			end
+			
+			-- if statement (one line)
+			l, m, r = line:match("^(if)%s+(.-):%s(.-)$")
+			if l and m then
+				r = string.def(r):gsub("%?%s(.-):%s+", "elseif %1 then "):gsub("%?", "else")
+				line = string.format("if %s then %s end", m, r)
+			end
+			
+			-- if statement and elseif statement (header)
+			l, m = line:match("^([%w]+)%s+(.-):$")
+			if l == "if" or l == "elseif" and m then
+				line = string.format("%s %s then", l, m)
+			end
+			
+			-- functions
+			l = line:match("^(let%s+).-$")
+			m, r = line:match(string.format("^%s(func)%%s+(.-):$", string.def(l)))
+			if m and r then 
+				line, lco = string.format("%sfunction %s", string.def(l, "", "local "), r), level + 1
+			end
+			
+			-- constructor
+			l, m = line:match("^(constructor)(.-):$")
+			if l and m then
+				line, lco = string.format("function constructor(self, %s)", m:match("^%((.-)%)$")), level + 1
+			end
+			
 			-- variables
-			l, k, r = line:match("^(%l+)%s+(.-)%s*=%s*(.-)$")
-			if l == "var" and k and r then
-				local keys, values = {}, {}
-				string.gsub(string.format("%s,", k), "%s*([%w%d_]+)%s*,", function(key) table.insert(keys, key) end)
-				string.gsub(string.format("%s,", r), "%s*(.-)%s*,", function(value) table.insert(values, value) end)
-				line = string.format("%s = %s", table.expand(keys, ", "), table.expand(values, ", "))
-				goto finish
-			end
-
-			-- local keyword
-			l = line:match("^(local%s+)")
-			
-			-- structures
-			k = line:match(string.format("^%sstruct%%s+([_%%.%%w]+)%%s+def$", string.def(l)))
-			if k then 
-				line, im = string.format("%s%s = %s.struct(function()", string.def(l), k, lib), il + 1
-				goto finish
+			l = line:match("^(let%s+).-$")
+			m, r = line:match(string.format("^%s(.-)%%s*=%%s*(.-)$", string.def(l)))
+			if m and r then
+				m = m:match("^(.-)%s*$")
+				line = string.format("%s%s = %s", string.def(l, "", "local "), m, parser.values(r))
 			end
 			
-			-- prototypes
-			k, r = line:match(string.format("^%sprototype%%s+([_%%.%%w]+)%%s+(.-)%%s*def$", string.def(l)))
-			if k then
-				local s = r:match("^is%s+([_%.%w]+)$")
-				line, im = string.format("%s%s = %s.prototype(%sfunction()", string.def(l), k, lib, string.def(s, "", "$, ")), il + 1
-				goto finish
-			end
+			-- variable types
+			line = line:gsub("%s+(.-)%s+is%s+(.-)%s+", " type(%1) == %2 ")
 			
-			-- constructor function
-			k, r = line:match("^constructor%((.-%))(.-)$")
-			if k then 
-				line = string.format("function constructor(self, %s%s", k, string.def(r))
-				goto finish
-			end
+			-- arrays
+			line = line:gsub("%b[]", function(array) return string.format("{%s}", parser.values(array:match("^%[(.-)%]$"))) end)
 			
-			-- closings
-			k, r = line:match("^(end)(.-)$")
-			if k then
-				if (newlines[#newlines]:sub(-1) == ",") then newlines[#newlines] = newlines[#newlines]:sub(1, -2) end
-				if il == im then line, im = string.format("end)%s", r), im - 1 end
-				goto finish
-			end
-
-			::finish::
+			-- negation
+			line = line:gsub("!([%w%d%._]+)", "not(%1)")
 
 			-- minifier
 			if minimal then line = line:gsub("%s*([,=+-])%s*", "%1") end
 
 			-- redirect comments and long strings
 			if (line:match("^.-(<comment>)$")) then lsc, isc = ln, true end
-			
 			if (line:match("^.-(<str>).-$") and line:match("^.-(<str.-/>).-$") == nil) then lsc, isc = ln, false end
 
-			-- replace placeholders
+			-- replace string placeholders
 			line = line:gsubr(ss34):gsubr(ss39):gsubr(ss91):gsubr(oss91)
-			line = line:gsubr(slc, (showc) and "$" or ""):gsubr(omlc, (showc) and "$" or "")
+			
+			-- replace special character placeholders
+			line = line:gsubr(scc)
 
 			-- indentation
-			local l, c = line:gsub("%b()", "<parenthesis/>"):gsub("(%[%[.-%]%])", "<p/>"):gsub([[%b'']], "<str/>"):gsub([[%b""]], "<str/>"), (showc and comment) or ""
-			l = l:gsub("function<parenthesis/>.-end", "<function/>"):gsub("function%s+.-<parenthesis/>.-end", "<function/>")
+			l = line:gsub("%b()", "<parenthesis/>"):gsub("\\.", "<char/>"):gsub("(%[%[.-%]%])", "<p/>"):gsub([[%b'']], "<str/>"):gsub([[%b""]], "<str/>"):gsub("function<parenthesis/>.-end", "<function/>"):gsub("function%s+.-<parenthesis/>.-end", "<function/>")
 			if (l:match("^(until).-$") or l:match("^(end).-$") or (l:match("^(elseif)%s+.-%s+(then)$") or l:match("^(else)$")) or l:match("^%s*(})%s*.-$")) then il = il - 1 end
-			if #l > 0 or #c > 0 then table.insert(newlines, string.format("%s%s%s", is:rep(il), line, c)) end
+			if #l > 0 or #comment > 0 then table.insert(newlines, string.format("%s%s%s", is:rep(il), line, (minimal and "") or comment)) end
 			if (l:match("^(while).-$") or l:match("^(repeat)$") or (l:match("^.-%s*(function<parenthesis/>)$") or l:match("^.-%s*(function)%s+.-$")) or l:match("^.-%s+(then)$") or l:match("^(else)$") or (l:match("^.-(do)$") and not l:match("^.-(end).-$")) or l:match("^.-%s*({)%s*$")) then il = il + 1 end
 
 		else
@@ -126,18 +162,26 @@ function table.expand(a,b,c) local d=""for e=1,#a-1 do d=string.format("%s%s%s",
 			line = line:gsubr(css91):gsubr(cmlc, (showc) and "$" or "")
 
 			-- display comment or long string
-			if showc or not isc and #line > 0 then table.insert(newlines, string.format("%s%s%s", lf:match("^(%s*).-$"), is:rep(il), line)) end
+			if not minimal and not isc and #line > 0 then table.insert(newlines, string.format("%s%s%s", lf:match("^(%s*).-$"), is:rep(il), line)) end
 
 		end
-	end
+		
+		-- final closures
+		
+		while lco and ln == #lines and #lf > 0 do
+			table.insert(lines, ln + 1, string.format("%send", is:rep(lco - 1)))
+			lco = (lco > 1 and lco - 1) or nil
+		end
 
+	end
+	
 	-- return result
 	return newlines, newlines[1]:match("^@compile%s*(.-)$")
 
 end
 
 if filename then
-	local lines, outpath = process(filename)
+	local lines, outpath = parser.process(filename)
 	local dirbits, namebits, basepath, strip = {}, {}, filename, 1
 	
 	-- generate file content
